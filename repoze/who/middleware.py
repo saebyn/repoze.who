@@ -288,6 +288,7 @@ def wrap_generator(result):
     """
     # Neat trick to pull the first iteration only. We need to do this outside
     # of the generator function to ensure it is called.
+    first = marker = []
     for iter in result:
         first = iter
         break
@@ -295,7 +296,8 @@ def wrap_generator(result):
     # Wrapper yields the first iteration, then passes result's iterations
     # directly up.
     def wrapper():
-        yield first
+        if first is not marker:
+            yield first
         for iter in result:
             # We'll let result's StopIteration bubble up directly.
             yield iter

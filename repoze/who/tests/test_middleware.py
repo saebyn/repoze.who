@@ -1,5 +1,16 @@
 import unittest
 
+
+class DummyIterableWithClose:
+    _closed = False
+    def __init__(self, iterable):
+        self._iterable = iterable
+    def __iter__(self):
+        return iter(self._iterable)
+    def close(self):
+        self._closed = True
+
+
 class TestMiddleware(unittest.TestCase):
 
     def _getTargetClass(self):
@@ -855,23 +866,39 @@ class TestIdentityDict(unittest.TestCase):
 
 class WrapGeneratorTests(unittest.TestCase):
 
-    def _getFUT(self):
+    def _callFUT(self, iterable):
         from repoze.who.middleware import wrap_generator
-        return wrap_generator
+        return wrap_generator(iterable)
 
-    def test_it(self):
+    def test_w_generator(self):
         L = []
         def gen(L=L):
             L.append('yo!')
             yield 'a'
             yield 'b'
-        wrap_generator = self._getFUT()
-        newgen = wrap_generator(gen())
+        newgen = self._callFUT(gen())
         self.assertEqual(L, ['yo!'])
         self.assertEqual(list(newgen), ['a', 'b'])
 
-class TestMakeTestMiddleware(unittest.TestCase):
+    def test_w_empty_generator(self):
+        def gen():
+            if False:
+                yield 'a'
+        newgen = self._callFUT(gen())
+        self.assertEqual(list(newgen), [])
 
+    def test_w_iterator_having_close(self):
+        def gen():
+            yield 'a'
+            yield 'b'
+        iterable = DummyIterableWithClose(gen())
+        newgen = self._callFUT(iterable)
+        self.failIf(iterable._closed)
+        self.assertEqual(list(newgen), ['a', 'b'])
+        self.failUnless(iterable._closed)
+
+
+class TestMakeTestMiddleware(unittest.TestCase):
     def setUp(self):
         import os
         self._old_WHO_LOG = os.environ.get('WHO_LOG')
